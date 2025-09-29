@@ -31,7 +31,49 @@ export function initViewer(container) {
 export function loadModel(viewer, urn) {
     return new Promise(function (resolve, reject) {
         function onDocumentLoadSuccess(doc) {
-            resolve(viewer.loadDocumentNode(doc, doc.getRoot().getDefaultGeometry()));
+            viewer.loadDocumentNode(doc, doc.getRoot().getDefaultGeometry())
+                .then(function (result) {
+                    // モデルが読み込まれた後にジオメトリを追加
+                    setTimeout(() => {
+                        try {
+                            // THREE.jsのインスタンスを取得
+                            const THREE = window.THREE;
+
+                            // 立方体を作成
+                            const cubeGeometry = new THREE.BoxGeometry(50, 50, 50);
+                            const cubeMaterial = new THREE.MeshPhongMaterial({
+                                color: 0x00ff00,
+                                transparent: true,
+                                opacity: 0.7
+                            });
+                            const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+                            cube.position.set(100, 100, 100);
+
+                            // 球を作成
+                            const sphereGeometry = new THREE.SphereGeometry(30, 32, 32);
+                            const sphereMaterial = new THREE.MeshPhongMaterial({
+                                color: 0x0000ff,
+                                transparent: true,
+                                opacity: 0.7
+                            });
+                            const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+                            sphere.position.set(-100, 100, -100);
+
+                            // ジオメトリをシーンに追加
+                            viewer.impl.scene.add(cube);
+                            viewer.impl.scene.add(sphere);
+
+                            // シーンを更新
+                            viewer.impl.invalidate(true);
+                            console.log('Custom geometries added successfully');
+                        } catch (error) {
+                            console.error('Error adding geometries:', error);
+                        }
+                    }, 1000); // モデル読み込み後1秒待ってから追加
+
+                    resolve(result);
+                })
+                .catch(reject);
         }
         function onDocumentLoadFailure(code, message, errors) {
             reject({ code, message, errors });
