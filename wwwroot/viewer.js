@@ -58,16 +58,24 @@ export function loadModel(viewer, urn) {
                             viewer.impl.createOverlayScene(overlayName);
 
                             // 立方体を作成
-                            const cubeGeometry = new THREE.BoxGeometry(modelHeight * 0.1, modelHeight * 0.1, modelHeight * 0.1);
+                            const cubeGeometry = new THREE.BoxGeometry(10, 10, 10);
+                            cubeGeometry.faces.forEach((face) => {
+                                if (face.normal.z > 0.9) {
+                                    face.color.setHex(0x0000ff);
+                                } else {
+                                    face.color.setHex(0xff0000);
+                                }
+                            });
+                        
                             const cubeMaterial = new THREE.MeshPhongMaterial({
-                                color: 0xff0000,
+                                vertexColors: THREE.FaceColors,
                                 transparent: true,
-                                opacity: 0.7,
+                                opacity: 0.85,
                                 side: THREE.DoubleSide
                             });
+                        
                             const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-                            cube.position.set(bounds.max.x, bounds.max.y + modelHeight * 0.2, bounds.max.z);
-
+                            cube.position.set(30, 20, 20);
                             // 球体を作成
                             const sphereGeometry = new THREE.SphereGeometry(modelHeight * 0.05, 32, 32);
                             const sphereMaterial = new THREE.MeshPhongMaterial({
