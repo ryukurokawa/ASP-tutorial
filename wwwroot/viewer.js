@@ -44,7 +44,7 @@ export function loadModel(viewer, urn) {
                                 throw new Error('Viewer implementation not ready');
                             }
 
-                            const THREE = window.THREE;
+                            const THREE = Autodesk.Viewing.Private.THREE;
                             if (!THREE) {
                                 throw new Error('THREE.js not available');
                             }
@@ -55,27 +55,23 @@ export function loadModel(viewer, urn) {
 
                             // オーバーレイシーンを作成
                             const overlayName = 'custom-scene';
-                            viewer.impl.createOverlayScene(overlayName);
-
-                            // 立方体を作成
-                            const cubeGeometry = new THREE.BoxGeometry(10, 10, 10);
-                            cubeGeometry.faces.forEach((face) => {
-                                if (face.normal.z > 0.9) {
-                                    face.color.setHex(0x0000ff);
-                                } else {
-                                    face.color.setHex(0xff0000);
-                                }
-                            });
-                        
-                            const cubeMaterial = new THREE.MeshPhongMaterial({
-                                vertexColors: THREE.FaceColors,
-                                transparent: true,
-                                opacity: 0.85,
-                                side: THREE.DoubleSide
-                            });
-                        
-                            const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-                            cube.position.set(30, 20, 20);
+                            if (!viewer.overlays.hasScene(overlayName)) {
+                                viewer.overlays.addScene(overlayName);
+                            }
+                            
+                            // 立方体を作成（6面マテリアルで上面だけ青）
+                            const materials = [
+                                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +X
+                                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -X
+                                new THREE.MeshBasicMaterial({ color: 0x0000ff }), // +Y ← 上面だけ青
+                                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -Y
+                                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +Z
+                                new THREE.MeshBasicMaterial({ color: 0xff0000 })  // -Z
+                              ];
+                              const cubeGeometry = new THREE.BoxGeometry(10, 10, 10);
+                              const cube = new THREE.Mesh(cubeGeometry, materials);
+                              cube.position.set(30, 20, 20);
+                            
                             // 球体を作成
                             const sphereGeometry = new THREE.SphereGeometry(modelHeight * 0.05, 32, 32);
                             const sphereMaterial = new THREE.MeshPhongMaterial({
@@ -87,9 +83,9 @@ export function loadModel(viewer, urn) {
                             const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
                             sphere.position.set(bounds.min.x, bounds.max.y + modelHeight * 0.2, bounds.min.z);
 
-                            // ジオメトリをシーンに追加
-                            viewer.impl.addOverlay(overlayName, cube);
-                            viewer.impl.addOverlay(overlayName, sphere);
+                             // ✅ オーバーレイに追加
+                            viewer.overlays.addMesh(cube, overlayName);
+                            viewer.overlays.addMesh(sphere, overlayName);
 
                             // シーンを更新
                             viewer.impl.invalidate(true, true, true);
