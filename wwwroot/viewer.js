@@ -67,22 +67,40 @@ export function loadModel(viewer, urn) {
                             const center = bounds.center();
                             const modelHeight = bounds.max.y - bounds.min.y;
                     
-                            // === 立方体（上面だけ青） ===
-                            const materials = [
-                                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +X
-                                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -X
-                                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +Y
-                                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -Y
-                                new THREE.MeshBasicMaterial({ color: 0x0000ff }), // +Z　 ← 上面だけ青
-                                new THREE.MeshBasicMaterial({ color: 0xff0000 })  // -Z
-                            ];
+                            // === 立方体（上面だけ市松模様） ===
+                            const cubeSize = modelHeight * 0.1;
+                            // ▼ Canvasで市松模様を生成（Forge Viewer互換）
+                            const canvas = document.createElement('canvas');
+canvas.width = 128;
+canvas.height = 128;
+const ctx = canvas.getContext('2d');
+const block = 16; // 市松模様のマス目サイズ
 
-                            // ✅ Forge ViewerのThree.jsではMeshFaceMaterialを使う
-                            const faceMaterial = new THREE.MeshFaceMaterial(materials);
-                    
-                            const cubeGeometry = new THREE.BoxGeometry(modelHeight * 0.1, modelHeight * 0.1, modelHeight * 0.1);
+for (let y = 0; y < canvas.height / block; y++) {
+  for (let x = 0; x < canvas.width / block; x++) {
+    ctx.fillStyle = (x + y) % 2 === 0 ? '#ffffff' : '#000000';
+    ctx.fillRect(x * block, y * block, block, block);
+  }
+}
+
+// TextureとしてTHREEに渡す
+const checkerTexture = new THREE.Texture(canvas);
+checkerTexture.needsUpdate = true;
+
+// === 各面マテリアル ===
+const materials = [
+  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +X
+  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -X
+  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +Y
+  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -Y
+  new THREE.MeshBasicMaterial({ map: checkerTexture }), // +Z ← 上面を市松模様に！
+  new THREE.MeshBasicMaterial({ color: 0xff0000 })  // -Z
+];
+                            // === Forge Viewer r71対応（MeshFaceMaterialを維持） ===
+                            const cubeGeometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
                             const cube = new THREE.Mesh(cubeGeometry, new THREE.MeshFaceMaterial(materials));
-                            
+                            // === モデルの上に配置（既存位置のまま） ===
+                            cube.position.set(center.x, bounds.max.y + modelHeight * 0.2, center.z);
                             // モデル中心の少し上に配置
                             cube.position.set(center.x, bounds.max.y + modelHeight * 0.2, center.z);
                     
