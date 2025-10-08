@@ -67,21 +67,56 @@ export function loadModel(viewer, urn) {
                             const center = bounds.center();
                             const modelHeight = bounds.max.y - bounds.min.y;
                     
-                            // === 立方体（上面だけ青） ===
-                            const materials = [
-                                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +X
-                                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -X
-                                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +Y
-                                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -Y
-                                new THREE.MeshBasicMaterial({ color: 0x0000ff }), // +Z　 ← 上面だけ青
-                                new THREE.MeshBasicMaterial({ color: 0xff0000 })  // -Z
-                            ];
+                            // === 立方体（上面ヒートマップ） ===
+const cubeSize = modelHeight * 0.1;
 
-                            // ✅ Forge ViewerのThree.jsではMeshFaceMaterialを使う
-                            const faceMaterial = new THREE.MeshFaceMaterial(materials);
-                    
-                            const cubeGeometry = new THREE.BoxGeometry(modelHeight * 0.1, modelHeight * 0.1, modelHeight * 0.1);
-                            const cube = new THREE.Mesh(cubeGeometry, new THREE.MeshFaceMaterial(materials));
+// 🔥 ヒートマップテクスチャを生成
+const canvas = document.createElement('canvas');
+canvas.width = 256;
+canvas.height = 256;
+const ctx = canvas.getContext('2d');
+
+// 横方向のグラデーション（赤→青）
+const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+gradient.addColorStop(0.0, '#ff0000'); // 赤（高温）
+gradient.addColorStop(0.25, '#ffff00'); // 黄
+gradient.addColorStop(0.5, '#00ff00'); // 緑
+gradient.addColorStop(0.75, '#00ffff'); // 水色
+gradient.addColorStop(1.0, '#0000ff'); // 青（低温）
+
+ctx.fillStyle = gradient;
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+const heatmapTexture = new THREE.Texture(canvas);
+heatmapTexture.needsUpdate = true;
+
+// === 各面のマテリアルを定義 ===
+// ForgeのThree.jsはMeshFaceMaterial対応なので6面それぞれ設定
+const materials = [
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +X
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -X
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +Y
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -Y
+    new THREE.MeshBasicMaterial({ map: heatmapTexture, side: THREE.DoubleSide }), // +Z ← 上面だけヒートマップ！
+    new THREE.MeshBasicMaterial({ color: 0xff0000 })  // -Z
+];
+
+const cubeGeometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+const cube = new THREE.Mesh(cubeGeometry, new THREE.MeshFaceMaterial(materials));
+
+// === モデル中心上に配置 ===
+cube.position.set(center.x, center.y, bounds.max.z + modelHeight * 0.1);
+
+// === オーバーレイに追加 ===
+viewer.overlays.addMesh(cube, overlayName);
+
+// === 再描画 ===
+viewer.impl.invalidate(true, true, true);
+
+console.log("✅ 上面ヒートマップ付きの立方体を追加しました");
+
+
+                            
                             
                             // モデル中心の少し上に配置
                             cube.position.set(center.x, bounds.max.y + modelHeight * 0.2, center.z);
