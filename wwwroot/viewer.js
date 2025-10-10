@@ -3,9 +3,7 @@
 async function getAccessToken(callback) {
     try {
       const resp = await fetch("/api/auth/token");
-      if (!resp.ok) {
-        throw new Error(await resp.text());
-      }
+      if (!resp.ok) throw new Error(await resp.text());
       const { access_token, expires_in } = await resp.json();
       callback(access_token, expires_in);
     } catch (err) {
@@ -22,7 +20,7 @@ async function getAccessToken(callback) {
         viewer.start();
         viewer.setTheme("light-theme");
   
-        // ✅ Viewer初期化イベントでTHREEを確保
+        // ✅ THREE.js 初期化確認
         viewer.addEventListener(Autodesk.Viewing.VIEWER_INITIALIZED, () => {
           window._FORGE_THREE =
             Autodesk.Viewing?.Private?.THREE ||
@@ -46,7 +44,6 @@ async function getAccessToken(callback) {
   
             viewer.addEventListener(Autodesk.Viewing.GEOMETRY_LOADED_EVENT, () => {
               setTimeout(() => {
-                // === THREE.jsを取得 ===
                 const THREE =
                   Autodesk.Viewing?.Private?.THREE ||
                   viewer.impl?.canvas?.ownerDocument.defaultView.THREE ||
@@ -57,23 +54,34 @@ async function getAccessToken(callback) {
                   return;
                 }
   
-                console.log("✅ THREE.js detected:", THREE.REVISION);
-  
-                // === モデル範囲取得 ===
+                　　　　// === モデル範囲 ===
                 const bounds = viewer.model.getBoundingBox();
-                const center = bounds.center();
-                const modelHeight = bounds.max.z - bounds.min.z; // ← Z軸を高さとして扱う
-  
-                // === サイズ定義 ===
+                
+                // ✅ center() がないForge環境用に自前で計算
+                const center = new THREE.Vector3(
+                  (bounds.max.x + bounds.min.x) / 2,
+                  (bounds.max.y + bounds.min.y) / 2,
+                  (bounds.max.z + bounds.min.z) / 2
+                );
+                const modelCenterWorld = center.clone();
+                
+                // ✅ 高さを取得（Y軸上方向モデル）
+                const modelHeight = bounds.max.y - bounds.min.y;
+                
+                // === サイズ設定 ===
                 const cubeSize = modelHeight * 0.1;
                 const width = cubeSize * 1.8;
                 const height = cubeSize * 1.0;
                 const depth = cubeSize * 1.4;
+                
+                // === カメラ上方向ベクトル取得 ===
+                const up = viewer.navigation.getCameraUpVector().normalize();
+                const liftAmount = modelHeight * 0.05;
   
-                // === ヒートマップテクスチャ生成 ===
+                // === ヒートマップ生成 ===
                 const canvas = document.createElement("canvas");
-                canvas.width = 256;
-                canvas.height = 256;
+                canvas.width = 512;
+                canvas.height = 512;
                 const ctx = canvas.getContext("2d");
                 const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
                 gradient.addColorStop(0.0, "#ff0000");
@@ -86,56 +94,57 @@ async function getAccessToken(callback) {
                 const heatmapTexture = new THREE.Texture(canvas);
                 heatmapTexture.needsUpdate = true;
   
-                // === オーバーレイ名登録 ===
+                // === オーバーレイ登録 ===
                 const overlayName = "custom-scene";
-                if (!viewer.overlays.hasScene(overlayName)) viewer.overlays.addScene(overlayName);
+                if (!viewer.overlays.hasScene(overlayName))
+                  viewer.overlays.addScene(overlayName);
   
-                // === マテリアル設定 ===
+                // === 直方体マテリアル ===
                 const materials = [
                   new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +X
                   new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -X
-                  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +Y
-                  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -Y
-                  new THREE.MeshBasicMaterial({ map: heatmapTexture, side: THREE.DoubleSide }), // +Z（上面）
-                  new THREE.MeshBasicMaterial({ color: 0xff0000 }) // -Z
+                  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +Z
+                  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -Z
+                  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +Y（上面）
+                  new THREE.MeshBasicMaterial({ color: 0xff0000 })  // -Y（底面）
                 ];
   
-                // === BoxGeometry作成 ===
+                // === 直方体 ===
                 const cubeGeometry = new THREE.BoxGeometry(width, height, depth);
-  
-                // === 上面拡張 ===
-                const expandRatio = 1.3;
-  
-                // Forgeが古いThree.jsを使っている場合
-                if (cubeGeometry.vertices) {
-                  cubeGeometry.vertices.forEach((v) => {
-                    if (v.z > 0) {
-                      v.x *= expandRatio;
-                      v.y *= expandRatio;
-                    }
-                  });
-                  cubeGeometry.verticesNeedUpdate = true;
-                  cubeGeometry.computeVertexNormals();
-                }
-                // 新しいThree.js（BufferGeometry）の場合
-                else if (cubeGeometry.attributes && cubeGeometry.attributes.position) {
-                  const pos = cubeGeometry.attributes.position;
-                  for (let i = 0; i < pos.count; i++) {
-                    const z = pos.getZ(i);
-                    if (z > 0) {
-                      pos.setX(i, pos.getX(i) * expandRatio);
-                      pos.setY(i, pos.getY(i) * expandRatio);
-                    }
-                  }
-                  pos.needsUpdate = true;
-                  cubeGeometry.computeVertexNormals();
-                }
-  
-                // === メッシュ作成 ===
                 const cube = new THREE.Mesh(cubeGeometry, new THREE.MeshFaceMaterial(materials));
-                cube.position.set(center.x, center.y, bounds.max.z + modelHeight * 0.2);
+                cube.position.copy(modelCenterWorld);
   
-                // === 球体（既存） ===
+                
+                const expandRatio = 5.0;
+                const planeWidth = width * expandRatio;
+                const planeDepth = depth * expandRatio;
+  
+                const planeGeometry = new THREE.PlaneGeometry(planeWidth, planeDepth);
+                const planeMaterial = new THREE.MeshBasicMaterial({
+                  map: heatmapTexture,
+                  side: THREE.DoubleSide,
+                  transparent: true,
+                  opacity: 0.9
+                });
+                const topPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+
+              
+  
+               
+                topPlane.lookAt(
+                  modelCenterWorld.x + up.x,
+                  modelCenterWorld.y + up.y,
+                  modelCenterWorld.z + up.z
+                );
+                
+
+                topPlane.position.set(
+                  modelCenterWorld.x + up.x * (height / 2 + liftAmount),
+                  modelCenterWorld.y + up.y * (height / 2 + liftAmount),
+                  modelCenterWorld.z + up.z * (height / 2 + liftAmount)
+                );
+  
+                //球体
                 const sphereGeometry = new THREE.SphereGeometry(modelHeight * 0.05, 32, 32);
                 const sphereMaterial = new THREE.MeshPhongMaterial({
                   color: 0x00ff00,
@@ -144,16 +153,23 @@ async function getAccessToken(callback) {
                   side: THREE.DoubleSide
                 });
                 const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-                sphere.position.set(center.x + modelHeight * 0.3, center.y, bounds.max.z + modelHeight * 0.2);
-  
-                // === オーバーレイ追加 ===
+                sphere.position.set(
+                  modelCenterWorld.x + modelHeight * 0.3,
+                  modelCenterWorld.y,
+                  modelCenterWorld.z
+                );
+                
+                console.log("📍 cube.position:", cube.position);
+                console.log("📍 topPlane.position:", topPlane.position);
+                console.log("📍 sphere.position:", sphere.position);
+                
+                
                 viewer.overlays.addMesh(cube, overlayName);
+                viewer.overlays.addMesh(topPlane, overlayName);
                 viewer.overlays.addMesh(sphere, overlayName);
-  
-                // === 再描画 ===
                 viewer.impl.invalidate(true, true, true);
   
-                console.log("✅ 上面を外側に拡張（台形っぽい形）で描画完了！");
+               
               }, 800);
             });
           })
@@ -167,7 +183,11 @@ async function getAccessToken(callback) {
       viewer.setLightPreset(0);
   
       const safeUrn = urn.startsWith("urn:") ? urn : "urn:" + urn;
-      Autodesk.Viewing.Document.load(safeUrn, onDocumentLoadSuccess, onDocumentLoadFailure);
+      Autodesk.Viewing.Document.load(
+        safeUrn,
+        onDocumentLoadSuccess,
+        onDocumentLoadFailure
+      );
     });
   }
   
