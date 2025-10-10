@@ -77,7 +77,8 @@ async function getAccessToken(callback) {
                 // === カメラ上方向ベクトル取得 ===
                 const up = viewer.navigation.getCameraUpVector().normalize();
                 const liftAmount = modelHeight * 0.05;
-  
+  console.log(viewer.navigation.getCameraUpVector());
+
                 // === ヒートマップ生成 ===
                 const canvas = document.createElement("canvas");
                 canvas.width = 512;
@@ -109,27 +110,39 @@ async function getAccessToken(callback) {
                   new THREE.MeshBasicMaterial({ color: 0xff0000 })  // -Y（底面）
                 ];
   
-                // === 直方体 ===
-                const cubeGeometry = new THREE.BoxGeometry(width, height, depth);
-                const cube = new THREE.Mesh(cubeGeometry, new THREE.MeshFaceMaterial(materials));
-                cube.position.copy(modelCenterWorld);
-  
-                
-                const expandRatio = 5.0;
-                const planeWidth = width * expandRatio;
-                const planeDepth = depth * expandRatio;
-  
-                const planeGeometry = new THREE.PlaneGeometry(planeWidth, planeDepth);
-                const planeMaterial = new THREE.MeshBasicMaterial({
-                  map: heatmapTexture,
-                  side: THREE.DoubleSide,
-                  transparent: true,
-                  opacity: 0.9
-                });
-                const topPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+                // === 直方体を作成 ===
+const cubeGeometry = new THREE.BoxGeometry(width, height, depth);
 
+
+
+if (cubeGeometry.vertices) {
+  // ✅ ForgeのThree.js (古い形式) は Geometry.vertices を使用
+  let yMax = -Infinity;
+  
+  // 上面のY値（高さ方向）を探す
+  cubeGeometry.vertices.forEach(v => {
+    yMax = Math.max(yMax, v.y);
+  });
+
+  // 上面の頂点だけ拡大（x,z方向に広げる）
+  cubeGeometry.vertices.forEach(v => {
+    if (Math.abs(v.y - yMax) < 0.0001) {
+      v.x *= expandRatio;
+      v.z *= expandRatio;
+    }
+  });
+
+  cubeGeometry.verticesNeedUpdate = true;
+  cubeGeometry.computeVertexNormals();
+}
+
+
+const expandRatio = 5.0; //上を5倍に拡大
+const planeWidth = width * expandRatio;
+const planeDepth = depth * expandRatio;
               
   
+const topPlane = new THREE.Mesh(planeGeometry, planeMaterial); 
                
                 topPlane.lookAt(
                   modelCenterWorld.x + up.x,
@@ -159,10 +172,7 @@ async function getAccessToken(callback) {
                   modelCenterWorld.z
                 );
                 
-                console.log("📍 cube.position:", cube.position);
-                console.log("📍 topPlane.position:", topPlane.position);
-                console.log("📍 sphere.position:", sphere.position);
-                
+             
                 
                 viewer.overlays.addMesh(cube, overlayName);
                 viewer.overlays.addMesh(topPlane, overlayName);
