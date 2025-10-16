@@ -99,46 +99,18 @@ const cube1 = new THREE.Mesh(geometry1, faceMaterial);
 cube1.position.copy(modelCenterWorld);
 cube1.position.z += modelHeight * 0.05;
 
-// === 2個目の直方体（上面なし）===
+
+// === 2個目の直方体 ===
 const biggerScale = 2.0;
-const halfW = (width * biggerScale) / 2;
-const halfH = (height * biggerScale) / 2;
-const halfD = (depth * biggerScale) / 2;
-
-const geometry2 = new THREE.Geometry();
-
-// 頂点定義（Z軸が上の場合）
-geometry2.vertices.push(
-  // 下
-  new THREE.Vector3(-halfW, -halfD, -halfH), // 0
-  new THREE.Vector3( halfW, -halfD, -halfH), // 1
-  new THREE.Vector3( halfW,  halfD, -halfH), // 2
-  new THREE.Vector3(-halfW,  halfD, -halfH), // 3
-  // 上
-  new THREE.Vector3(-halfW, -halfD,  halfH), // 4
-  new THREE.Vector3( halfW, -halfD,  halfH), // 5
-  new THREE.Vector3( halfW,  halfD,  halfH), // 6
-  new THREE.Vector3(-halfW,  halfD,  halfH)  // 7
-);
-
-// === 下と側面のみ ===
-geometry2.faces.push(
-  // 下
-  new THREE.Face3(0, 1, 2), new THREE.Face3(0, 2, 3),
-  // 側面
-  new THREE.Face3(0, 4, 5), new THREE.Face3(0, 5, 1),
-  new THREE.Face3(1, 5, 6), new THREE.Face3(1, 6, 2),
-  new THREE.Face3(2, 6, 7), new THREE.Face3(2, 7, 3),
-  new THREE.Face3(3, 7, 4), new THREE.Face3(3, 4, 0)
-);
-
-geometry2.computeFaceNormals();
-geometry2.computeVertexNormals();
-
+const geometry2 = new THREE.BoxGeometry(
+  width * biggerScale,
+  height * biggerScale,
+  depth * biggerScale
+);;
 const cube2 = new THREE.Mesh(geometry2, faceMaterial);
 cube2.position.copy(modelCenterWorld);
-cube2.position.x += width * 2.0;
-cube2.position.z += modelHeight *0.3
+cube2.position.x += width * 2.0; 
+cube2.position.z += modelHeight * 0.05 +0.001;
 
 
 // === Forgeオーバーレイに登録 ===
@@ -157,8 +129,6 @@ viewer.impl.invalidate(true, true, true);
           })
           .catch(reject);
       }
-      console.log(THREE.REVISION);
-
   
       function onDocumentLoadFailure(code, message, errors) {
         reject({ code, message, errors });
