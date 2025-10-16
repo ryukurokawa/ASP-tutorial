@@ -100,29 +100,48 @@ cube1.position.copy(modelCenterWorld);
 cube1.position.z += modelHeight * 0.05;
 
 
-// === 2個目の直方体 ===
+　　　　　　　// === 2個目の直方体（上だけ削除） ===
 const biggerScale = 2.0;
-const geometry2 = new THREE.BoxGeometry(
+let geometry2;
+
+// ✅ Forge環境によってBoxGeometryがGeometry or BufferGeometryになるため安全分岐
+const baseGeometry = new THREE.BoxGeometry(
   width * biggerScale,
   height * biggerScale,
   depth * biggerScale
-);;
-const cube2 = new THREE.Mesh(geometry2, faceMaterial);
+);
+
+let geomMod;
+if (baseGeometry.isBufferGeometry) {
+  geomMod = new THREE.Geometry().fromBufferGeometry(baseGeometry);
+} else {
+  geomMod = baseGeometry.clone();
+}
+
+// ✅ 上向きZ部分削除
+geomMod.faces = geomMod.faces.filter(face => face.normal.z < 0.9);
+geomMod.computeFaceNormals();
+geomMod.computeVertexNormals();
+
+// === メッシュ作成 ===
+const cube2 = new THREE.Mesh(geomMod, faceMaterial);
+
+// === 配置
 cube2.position.copy(modelCenterWorld);
-cube2.position.x += width * 2.0; 
-cube2.position.z += modelHeight * 0.05 +0.001;
+cube2.position.x += width * 2.0;     
+cube2.position.z += modelHeight * 0.05 + 0.001; 
 
-
-// === Forgeオーバーレイに登録 ===
 const overlayName = "custom-scene";
+
+// ✅ モデル読み込み後にも必ず再登録
 if (!viewer.overlays.hasScene(overlayName)) {
   viewer.overlays.addScene(overlayName);
 }
+
+
 viewer.overlays.addMesh(cube1, overlayName);
 viewer.overlays.addMesh(cube2, overlayName);
-
 viewer.impl.invalidate(true, true, true);
-
 
               }, 800);
             });
