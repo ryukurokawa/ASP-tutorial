@@ -81,59 +81,50 @@ async function getAccessToken(callback) {
   　　　　　　　　　console.log(viewer.navigation.getCameraUpVector());
 
                 
-                // === オーバーレイ登録 ===
-                const overlayName = "custom-scene";
-                if (!viewer.overlays.hasScene(overlayName))
-                  viewer.overlays.addScene(overlayName);
-  
-                // === 直方体マテリアル ===
-                const materials = [
-                  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +X
-                  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -X
-                  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +Z
-                  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -Z
-                  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +Y（上面）
-                  new THREE.MeshBasicMaterial({ color: 0xff0000 })  // -Y（底面）
-                ];
 
-                
-  
-               
+  　　　　　　　　　// === マテリアル ===
+const materials = [
+  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +X
+  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -X
+  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +Z
+  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // -Z
+  new THREE.MeshBasicMaterial({ color: 0xff0000 }), // +Y（上面）
+  new THREE.MeshBasicMaterial({ color: 0xff0000 })  // -Y（底面）
+];
+const faceMaterial = new THREE.MeshFaceMaterial(materials);
 
-                // === 上面を最初から広くした形状を自前定義 ===
-const geometry = new THREE.Geometry();
+// === 1個目の直方体 ===
+const geometry1 = new THREE.BoxGeometry(width, height, depth);
+const cube1 = new THREE.Mesh(geometry1, faceMaterial);
+cube1.position.copy(modelCenterWorld);
+cube1.position.z += modelHeight * 0.05;
 
-const halfW = width / 2;
-const halfD = depth / 2;
-const halfH = height / 2;
+// === 2個目の直方体（上面なし）===
+const biggerScale = 2.0;
+const halfW = (width * biggerScale) / 2;
+const halfH = (height * biggerScale) / 2;
+const halfD = (depth * biggerScale) / 2;
 
+const geometry2 = new THREE.Geometry();
 
-const topScale = 2.0; 
-
-// 頂点定義（Y軸が高さ方向の場合）
-geometry.vertices.push(
-  // 下の面
-  new THREE.Vector3(-halfW, -halfH, -halfD), 
-  new THREE.Vector3( halfW, -halfH, -halfD), 
-  new THREE.Vector3( halfW, -halfH,  halfD), 
-  new THREE.Vector3(-halfW, -halfH,  halfD), 
-
-  //上（z軸が上のため）
-new THREE.Vector3(-halfW * topScale, -halfD * topScale,  halfH), 
-new THREE.Vector3( halfW * topScale, -halfD * topScale,  halfH), 
-new THREE.Vector3( halfW * topScale,  halfD * topScale,  halfH), 
-new THREE.Vector3(-halfW * topScale,  halfD * topScale,  halfH)  
+// 頂点定義（Z軸が上の場合）
+geometry2.vertices.push(
+  // 下
+  new THREE.Vector3(-halfW, -halfD, -halfH), // 0
+  new THREE.Vector3( halfW, -halfD, -halfH), // 1
+  new THREE.Vector3( halfW,  halfD, -halfH), // 2
+  new THREE.Vector3(-halfW,  halfD, -halfH), // 3
+  // 上
+  new THREE.Vector3(-halfW, -halfD,  halfH), // 4
+  new THREE.Vector3( halfW, -halfD,  halfH), // 5
+  new THREE.Vector3( halfW,  halfD,  halfH), // 6
+  new THREE.Vector3(-halfW,  halfD,  halfH)  // 7
 );
 
-
-
-
-// 面を定義
-geometry.faces.push(
+// === 下と側面のみ ===
+geometry2.faces.push(
   // 下
   new THREE.Face3(0, 1, 2), new THREE.Face3(0, 2, 3),
-  // 上
-  new THREE.Face3(4, 5, 6), new THREE.Face3(4, 6, 7),
   // 側面
   new THREE.Face3(0, 4, 5), new THREE.Face3(0, 5, 1),
   new THREE.Face3(1, 5, 6), new THREE.Face3(1, 6, 2),
@@ -141,41 +132,33 @@ geometry.faces.push(
   new THREE.Face3(3, 7, 4), new THREE.Face3(3, 4, 0)
 );
 
-geometry.computeFaceNormals();
-geometry.computeVertexNormals();
+geometry2.computeFaceNormals();
+geometry2.computeVertexNormals();
 
-const faceMaterial = new THREE.MeshFaceMaterial(materials);
+const cube2 = new THREE.Mesh(geometry2, faceMaterial);
+cube2.position.copy(modelCenterWorld);
+cube2.position.x += width * 2.0;
+cube2.position.z += modelHeight *0.3
 
-const cube = new THREE.Mesh(geometry, faceMaterial);
-cube.position.z += modelHeight * 0.05;
-  
-                //球体
-                const sphereGeometry = new THREE.SphereGeometry(modelHeight * 0.05, 32, 32);
-                const sphereMaterial = new THREE.MeshPhongMaterial({
-                  color: 0x00ff00,
-                  transparent: true,
-                  opacity: 0.7,
-                  side: THREE.DoubleSide
-                });
-                const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-                sphere.position.set(
-                  modelCenterWorld.x + modelHeight * 0.3,
-                  modelCenterWorld.y,
-                  modelCenterWorld.z
-                );
-                
-             
-                
-                viewer.overlays.addMesh(cube, overlayName);
-                viewer.overlays.addMesh(sphere, overlayName);
-                viewer.impl.invalidate(true, true, true);
-  
-               
+
+// === Forgeオーバーレイに登録 ===
+const overlayName = "custom-scene";
+if (!viewer.overlays.hasScene(overlayName)) {
+  viewer.overlays.addScene(overlayName);
+}
+viewer.overlays.addMesh(cube1, overlayName);
+viewer.overlays.addMesh(cube2, overlayName);
+
+viewer.impl.invalidate(true, true, true);
+
+
               }, 800);
             });
           })
           .catch(reject);
       }
+      console.log(THREE.REVISION);
+
   
       function onDocumentLoadFailure(code, message, errors) {
         reject({ code, message, errors });
